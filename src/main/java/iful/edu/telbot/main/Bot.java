@@ -1,19 +1,27 @@
 package iful.edu.telbot.main;
 
-import java.util.ArrayList;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.Comparator;
 import java.util.List;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.telegram.telegrambots.api.methods.send.SendMessage;
 import org.telegram.telegrambots.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.api.objects.Message;
 import org.telegram.telegrambots.api.objects.PhotoSize;
 import org.telegram.telegrambots.api.objects.Update;
-import org.telegram.telegrambots.api.objects.replykeyboard.ReplyKeyboardMarkup;
-import org.telegram.telegrambots.api.objects.replykeyboard.buttons.KeyboardButton;
-import org.telegram.telegrambots.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.exceptions.TelegramApiException;
+import org.w3c.dom.Document;
+
+import com.vdurmont.emoji.EmojiParser;
+
+import iful.edu.telbot.classes.CurrentWeatherData;
+import iful.edu.telbot.classes.Location;
 
 public class Bot extends TelegramLongPollingBot {
 
@@ -24,90 +32,73 @@ public class Bot extends TelegramLongPollingBot {
 	private String lastPicture;
 	private int f_height;
 	private int f_width;
+	private CurrentWeatherData weatherData = new CurrentWeatherData();
 
 	@Override
 	public void onUpdateReceived(Update update) {
 		Message message = update.getMessage();
 		if (message.hasText() && message.getText().equals("/start")) {
 			checkAndSetChat(message);
-		} else if (message.hasText() && message.getText().equals("/skip") && message.getChatId().toString().equals(MAIN_CHAT)) {
-			String member = message.getFrom().getFirstName() + " " + message.getFrom().getLastName();
-			sendMsg(String.valueOf(ADMIN_CHAT), member);
-
-		} else if (message.hasText() && message.getText().equals("/board") && message.getChatId().toString().equals(MAIN_CHAT)) {
-			SendMessage smessage = new SendMessage() // Create a message object object
-					.setChatId(message.getChatId().toString()).setText("Here is your keyboard");
-			ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
-			List<KeyboardRow> keyboard = new ArrayList<>();
-			KeyboardRow row = new KeyboardRow();
-			row.add("Good reason");
-			row.add("Lazy ass");
-			keyboard.add(row);
-			keyboardMarkup.setKeyboard(keyboard);
-			smessage.setReplyMarkup(keyboardMarkup);
+		} else if (message.hasText() && message.getText().equals("/weather") && message.getChatId().toString().equals(MAIN_CHAT)) {
 			try {
-				sendMessage(smessage);
-			} catch (TelegramApiException e) {
+				getCurrentWeather(new Location("Ivano-Frankivsk", "UA"));
+				String text = EmojiParser
+						.parseToUnicode(":thermometer: Temperature: " + weatherData.getTemperature().toString() + "\n:" + "cloud: Sky: " + weatherData.getClouds().getValue() + "\n" + ":dash: Wind: " + weatherData.getWind().toString());
+				sendMsg(message.getChatId().toString(), text);
+			} catch (Exception e) {
 				e.printStackTrace();
 			}
+
+		} /*
+			 * else if (message.hasText() && message.getText().equals("/skip") &&
+			 * message.getChatId().toString().equals(MAIN_CHAT)) { setButtons(message); }
+			 */
+	}
+
+	private CurrentWeatherData getCurrentWeather(Location location) throws Exception {
+		String city = location.getCity();
+		String country = location.getCountry();
+
+		try {
+			URL url;
+			String appID = "671d3c8f8c6729fd1eeb91756513e170";
+			url = new URL("http://api.openweathermap.org/data/2.5/weather?q=" + city + "," + country + "&units=" + location.getUnit() + "&mode=xml&APPID=" + appID);
+			HttpURLConnection con = (HttpURLConnection) url.openConnection();
+			con.setRequestMethod("GET");
+			con.connect();
+			InputStream in = con.getInputStream();
+			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+			DocumentBuilder builder = factory.newDocumentBuilder();
+			Document doc = builder.parse(in);
+			weatherData.setAllWeatherDataByTagNames(doc);
+
+		} catch (Exception e) {
+			System.out.println("Weather parsing error. please try again or contact app developer.");
+			e.printStackTrace();
 		}
-
-		/*
-		 * else if (message.hasText() && message.getText().equals("/pic")) { if
-		 * (lastPicture != null) { sendPht(message); sendMsg(message, f_height + "\n" +
-		 * f_width); } else { sendMsg(message, "No one picture were before"); }
-		 * 
-		 * } else if (message.hasPhoto()) { handlePhoto(message); sendMsg(message,
-		 * f_height + "\n" + f_width); } else if (message.hasText() &&
-		 * message.getText().equals("/Марік")) { sendMsg(message, "Не підр"); } else if
-		 * (message.hasText() && message.getText().equals("/Коля")) { sendMsg(message,
-		 * "Хороша людина"); } else { sendMsg(message, message.getText()); }
-		 */
+		return weatherData;
 	}
 
-	// private CurrentWeather getCurrentWeather(String city) throws Exception {
-	// try {
-	// JSONObject weatherObject = getWeatherObject("weather", city);
-	// CurrentWeather weather = JsonUtil.toObject(weatherObject,
-	// CurrentWeather.class);
-	// if (weather == null) {
-	// throw new Exception("Cannot parse weather");
-	// }
-	// return weather;
-	// } catch (Exception e) {
-	// logger.error("Cannot get weather data", e);
-	// throw e;
-	// }
-	// }
-
-	public synchronized void setButtons(SendMessage sendMessage) {
-		// Создаем клавиуатуру
-		ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
-		sendMessage.setReplyMarkup(replyKeyboardMarkup);
-		replyKeyboardMarkup.setSelective(true);
-		replyKeyboardMarkup.setResizeKeyboard(true);
-		replyKeyboardMarkup.setOneTimeKeyboard(false);
-
-		// Создаем список строк клавиатуры
-		List<KeyboardRow> keyboard = new ArrayList<>();
-
-		// Первая строчка клавиатуры
-		KeyboardRow keyboardFirstRow = new KeyboardRow();
-		// Добавляем кнопки в первую строчку клавиатуры
-		keyboardFirstRow.add(new KeyboardButton("Привет"));
-
-		// Вторая строчка клавиатуры
-		KeyboardRow keyboardSecondRow = new KeyboardRow();
-		// Добавляем кнопки во вторую строчку клавиатуры
-		keyboardSecondRow.add(new KeyboardButton("Помощь"));
-
-		// Добавляем все строчки клавиатуры в список
-		keyboard.add(keyboardFirstRow);
-		keyboard.add(keyboardSecondRow);
-		// и устанваливаем этот список нашей клавиатуре
-		replyKeyboardMarkup.setKeyboard(keyboard);
-	}
-
+	/*
+	 * public synchronized void setButtons(Message message) { SendMessage smessage =
+	 * new SendMessage() // Create a message object object
+	 * .setChatId(message.getChatId()).setText("Here is your keyboard"); // Create
+	 * ReplyKeyboardMarkup object ReplyKeyboardMarkup keyboardMarkup = new
+	 * ReplyKeyboardMarkup(); // Create the keyboard (list of keyboard rows)
+	 * List<KeyboardRow> keyboard = new ArrayList<>(); // Create a keyboard row
+	 * KeyboardRow row = new KeyboardRow(); // Set each button, you can also use
+	 * KeyboardButton objects if you need // something else than text
+	 * row.add("Row 1 Button 1"); row.add("Row 1 Button 2"); // Add the first row to
+	 * the keyboard keyboard.add(row);
+	 * 
+	 * // Set the keyboard to the markup keyboardMarkup.setKeyboard(keyboard); //
+	 * Add it to the message smessage.setReplyMarkup(keyboardMarkup); String member
+	 * = message.getFrom().getFirstName() + " " + message.getFrom().getLastName();
+	 * SendMessage nsmessage = new SendMessage() // Create a message object object
+	 * .setChatId(ADMIN_CHAT).setText(member); try { sendMessage(nsmessage); //
+	 * Sending our message object to user } catch (TelegramApiException e) {
+	 * e.printStackTrace(); } }
+	 */
 	private void handlePhoto(Message message) {
 		List<PhotoSize> photos = message.getPhoto();
 		f_height = photos.stream().sorted(Comparator.comparing(PhotoSize::getFileSize).reversed()).findFirst().orElse(null).getHeight();
