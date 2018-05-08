@@ -4,7 +4,7 @@ public class Clouds {
 	private String value;
 	private String name;
 
-	public Clouds(String name, String value) {
+	public Clouds(String value, String name) {
 		super();
 		this.name = name;
 		this.value = value;
@@ -28,7 +28,7 @@ public class Clouds {
 
 	@Override
 	public String toString() {
-		return getValue() + " : " + getName();
+		return getValue() + "%, " + getName();
 	}
 
 }

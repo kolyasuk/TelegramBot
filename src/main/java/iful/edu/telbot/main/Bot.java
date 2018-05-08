@@ -43,7 +43,7 @@ public class Bot extends TelegramLongPollingBot {
 			try {
 				getCurrentWeather(new Location("Ivano-Frankivsk", "UA"));
 				String text = EmojiParser
-						.parseToUnicode(":thermometer: Temperature: " + weatherData.getTemperature().toString() + "\n:" + "cloud: Sky: " + weatherData.getClouds().getValue() + "\n" + ":dash: Wind: " + weatherData.getWind().toString());
+						.parseToUnicode(":thermometer: Temperature: " + weatherData.getTemperature().toString() + "\n:" + "cloud: Sky: " + weatherData.getClouds().toString() + "\n" + ":dash: Wind: " + weatherData.getWind().toString());
 				sendMsg(message.getChatId().toString(), text);
 			} catch (Exception e) {
 				e.printStackTrace();
